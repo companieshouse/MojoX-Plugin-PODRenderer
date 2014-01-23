@@ -1,0 +1,6 @@
+lib/MojoX/Plugin/PODRenderer.pm
+t/podrenderer.t
+README.pod
+Makefile.PL
+MANIFEST
+Changes
