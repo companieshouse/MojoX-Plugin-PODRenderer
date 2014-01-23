@@ -11,6 +11,8 @@ use boolean;
 use Class::MOP;
 use File::Find;
 
+our $VERSION = '0.01';
+
 # Paths to search
 my @PATHS = map { $_, "$_/pods" } @INC;
 
