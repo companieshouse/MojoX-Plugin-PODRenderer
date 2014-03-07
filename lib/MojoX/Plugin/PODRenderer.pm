@@ -190,9 +190,9 @@ sub _perldoc {
     my $perldoc = $self->url_for('/perldoc/');
     $dom->find('a[href]')->each(
         sub {
-            my $attrs = shift->attrs;
-            $attrs->{href} =~ s!%3A%3A!/!gi
-            if $attrs->{href} =~ s!^http://search\.cpan\.org/perldoc\?!$perldoc!;
+            my $attr = shift->attr;
+            $attr->{href} =~ s!%3A%3A!/!gi
+            if $attr->{href} =~ s!^http://search\.cpan\.org/perldoc\?!$perldoc!;
         }
     );
 
@@ -203,9 +203,9 @@ sub _perldoc {
             my $e = shift;
             return if $e->all_text =~ /^\s*\$\s+/m;
 
-            my $attrs = $e->attrs;
-            my $class = $attrs->{class};
-            $attrs->{class} = defined $class ? "$class prettyprint" : 'prettyprint';
+            my $attr = $e->attr;
+            my $class = $attr->{class};
+            $attr->{class} = defined $class ? "$class prettyprint" : 'prettyprint';
         }
     );
 
