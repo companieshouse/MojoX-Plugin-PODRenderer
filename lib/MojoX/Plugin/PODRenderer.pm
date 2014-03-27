@@ -1,4 +1,5 @@
 package MojoX::Plugin::PODRenderer;
+# ABSTRACT: POD rendering plugin.
 use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::Asset::File;
