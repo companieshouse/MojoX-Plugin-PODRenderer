@@ -1,4 +1,6 @@
 Revision history for Perl module MojoX::Plugin::PODRenderer
 
+{{$NEXT}}
+
 0.01 2014-01-23
  - first release to CPAN
