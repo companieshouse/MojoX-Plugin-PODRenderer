@@ -1,4 +1,4 @@
-{{ $dist->name }}-*
+MojoX-Plugin-PODRenderer-*
 blib/
 .build/
 _build/
