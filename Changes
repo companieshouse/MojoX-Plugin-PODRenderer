@@ -2,6 +2,9 @@ Revision history for Perl module MojoX::Plugin::PODRenderer
 
 {{$NEXT}}
 
+0.31  2018-05-16
+  - Replace deprecated methods to support Mojolicious 7.78
+
 0.30  2014-07-31
   - harmonise to CHGOVUK standard
 
