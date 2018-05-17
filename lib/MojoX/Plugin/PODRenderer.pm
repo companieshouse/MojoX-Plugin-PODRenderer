@@ -5,14 +5,15 @@ use Mojo::Base 'Mojolicious::Plugin';
 use Mojo::Asset::File;
 use Mojo::ByteStream 'b';
 use Mojo::DOM;
-use Mojo::Util qw(slurp url_escape class_to_path xml_escape);
+use Mojo::Util qw(url_escape class_to_path xml_escape);
+use Mojo::File 'path';
 use Pod::Simple::HTML;
 use Pod::Simple::Search;
 use boolean;
 use Class::MOP;
 use File::Find;
 
-our $VERSION = '0.30';
+our $VERSION = '0.31';
 
 # Paths to search
 my @PATHS = map { $_, "$_/pods" } @INC;
@@ -172,7 +173,7 @@ sub _perldoc {
         return _generateIndex($self);
     }
     else {
-        my $slurped = slurp $path;
+        my $slurped = path($path)->slurp;
         $html = $is_perl_source ? "<pre>".xml_escape($slurped)."</pre>" : _pod_to_html($slurped);
 
         # Ensure % gets escaped before going into the template
