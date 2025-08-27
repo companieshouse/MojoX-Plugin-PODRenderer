@@ -1,19 +1,19 @@
 package MojoX::Plugin::PODRenderer;
-# ABSTRACT: POD rendering plugin.
 use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::Asset::File;
 use Mojo::ByteStream 'b';
 use Mojo::DOM;
 use Mojo::Util qw(url_escape class_to_path xml_escape);
-use Mojo::File 'path';
 use Pod::Simple::HTML;
 use Pod::Simple::Search;
 use boolean;
 use Class::MOP;
 use File::Find;
 
-our $VERSION = '0.31';
+our $VERSION = '0.01';
+
+my $log;
 
 # Paths to search
 my @PATHS = map { $_, "$_/pods" } @INC;
@@ -21,6 +21,7 @@ my @PATHS = map { $_, "$_/pods" } @INC;
 sub register {
     my ($self, $app, $conf) = @_;
 
+    $log = $app->log;
     my $preprocess = $conf->{preprocess} || 'ep';
     $app->renderer->add_handler(
         $conf->{name} || 'pod' => sub {
@@ -40,15 +41,15 @@ sub register {
     );
 }
 
-# ------------------------------------------------------------------------------ 
+# ------------------------------------------------------------------------------
 
 sub _process_found_file {
     my ($name2path, $path2name) = @_;
 
-    warn "2path %s - 2name %s \n",  $name2path, $path2name;
+    $log->warn("2path $name2path - 2name $path2name\n";
 }
 
-# ------------------------------------------------------------------------------ 
+# ------------------------------------------------------------------------------
 
 sub _generateIndex {
     my $self = shift;
@@ -98,7 +99,7 @@ sub _generateIndex {
             elsif ($name =~ /::Controllers::/) { $section = 'controllers' }
             elsif ($name =~ /::Adapter::/)     { $section = 'adapters'    }
             elsif ($name =~ /::Plugins?::/)    { $section = 'plugins'     }
-            
+
             push @{$modules->{$section}}, { name => $name, has_doc => $has_pod?true:false, path => $url };
         }
     }
@@ -106,10 +107,10 @@ sub _generateIndex {
 
     my ($template, undef) = $self->app->renderer->render(
         $self,
-        { 
+        {
             template    => 'perldoc/perldocindex',
-            partial     => 1, 
-            handler     => 'ep', 
+            partial     => 1,
+            handler     => 'ep',
             title       => "Index",
             guides      => $guides,
             modules     => $modules,
@@ -121,7 +122,7 @@ sub _generateIndex {
     return;
 }
 
-# ------------------------------------------------------------------------------ 
+# ------------------------------------------------------------------------------
 
 sub _perldoc {
     my $self = shift;
@@ -165,7 +166,7 @@ sub _perldoc {
             $linked_file_name = $file_name . '.pm'; # Link is source
         }
     }
-    
+
     my $html = undef;
 
     if (!-e $path) {
@@ -173,7 +174,7 @@ sub _perldoc {
         return _generateIndex($self);
     }
     else {
-        my $slurped = path($path)->slurp;
+        my $slurped = Mojo::File->new($path)->slurp;
         $html = $is_perl_source ? "<pre>".xml_escape($slurped)."</pre>" : _pod_to_html($slurped);
 
         # Ensure % gets escaped before going into the template
@@ -185,29 +186,29 @@ sub _perldoc {
     # TODO ATTRIBUTES ==== TODO Autoinsert
     # Introspect the class to find the attributes
     _parse_attributes(\$html, $package, $module) if !$is_perl_source && ($html =~ /\[\[ATTRIBUTES\]\]/);
-  
+
 
     # Rewrite links
     my $dom     = Mojo::DOM->new("$html");
     my $perldoc = $self->url_for('/perldoc/');
     $dom->find('a[href]')->each(
         sub {
-            my $attr = shift->attr;
-            $attr->{href} =~ s!%3A%3A!/!gi
-            if $attr->{href} =~ s!^http://search\.cpan\.org/perldoc\?!$perldoc!;
+            my $attrs = shift->attrs;
+            $attrs->{href} =~ s!%3A%3A!/!gi
+            if $attrs->{href} =~ s!^http://search\.cpan\.org/perldoc\?!$perldoc!;
         }
     );
 
-    
+
     # Rewrite code blocks for syntax highlighting
     $dom->find('pre')->each(
         sub {
             my $e = shift;
             return if $e->all_text =~ /^\s*\$\s+/m;
 
-            my $attr = $e->attr;
-            my $class = $attr->{class};
-            $attr->{class} = defined $class ? "$class prettyprint" : 'prettyprint';
+            my $attrs = $e->attrs;
+            my $class = $attrs->{class};
+            $attrs->{class} = defined $class ? "$class prettyprint" : 'prettyprint';
         }
     );
 
@@ -271,40 +272,40 @@ sub _perldoc {
         $dom->find('pre')->each(
             sub {
                 my $e = shift;
-    
+
                 my $re             = qr/\@(param|returns|named|throws) (.+)/;
                 my $context        = 'before';
                 my $has_seen_tags  = false;
-    
+
                 my %parts     = (
                     before => [[]], after   => [[]],
-                    param  => [],   returns => [], 
+                    param  => [],   returns => [],
                     named  => [],   throws  => [],
                 );
-    
+
                 if ($e->all_text =~ $re) {
                     foreach my $line (split "\n", $e->all_text) {
-                        
-                        if ($line =~ /^ *$/) { # Blank lines switch 
+
+                        if ($line =~ /^ *$/) { # Blank lines switch
                             $context = $has_seen_tags ? 'after' : 'before';
                         }
-    
+
                         if ($line =~ $re) {
                             $context       = $1; # One of the tag contexts
                             $line          = $2;
                             $has_seen_tags = true;
                             push @{$parts{$context}},[]; # Create a new array for the new context
                         }
-    
+
                         if (defined $context) {
                             # Get the last item of this type, and add to it.
                             $line  =~ s/^ *// if ($context !~ /before|after/);
                             push @{$parts{ $context }->[-1]}, $line;
                             next;
                         }
-    
+
                     }
-    
+
                     # Output the parts - we do this by appending to the original element
                     # in reverse order and then removing the original.
 
@@ -312,10 +313,10 @@ sub _perldoc {
                     if (scalar @{$parts{after}->[0]}) {
                         $e->append('<pre>' . join(" ",@{$parts{after}->[0]}) . '</pre>');
                     }
-    
+
                     if (@{$parts{returns}} || @{$parts{param}} || @{$parts{named}}) {
                         my $block = '<div class="tag-table-block">';
-        
+
                         # Output Parameters
                         if (scalar @{$parts{param}}) {
                             $block .= __start_table( 'parameters', '3' );
@@ -325,7 +326,7 @@ sub _perldoc {
                             }
                             $block .= '</table>';
                         }
-    
+
                         # Output Named Parameters
                         if (scalar @{$parts{named}}) {
                             $block .= __start_table( 'named parameters', '3' );
@@ -335,7 +336,7 @@ sub _perldoc {
                             }
                             $block .= '</table>';
                         }
-    
+
                         # Output Return
                         if (scalar @{$parts{returns}}) {
                             $block .= __start_table( 'returns', '1' );
@@ -343,7 +344,7 @@ sub _perldoc {
                             $block .= qq|<tr><td>$whole_line</td></tr>|;
                             $block .= '</table>';
                         }
-                        
+
                         # Output Throws
                         if (scalar @{$parts{throws}}) {
                             $block .= __start_table( 'throws', '1' );
@@ -356,12 +357,12 @@ sub _perldoc {
                         $block .= '</div>';
                         $e->append( $block );
                     }
-    
+
                     # Output BEFORE
                     if (scalar @{$parts{before}->[0]}) {
                         $e->append( '<pre class="prettyprint">' . join(" ",@{$parts{before}->[0]}) . '</pre>');
                     }
-                  
+
                     # Remove the original element
                     $e->remove;
                 }
@@ -380,10 +381,10 @@ sub _perldoc {
 
     my ($template, undef) = $self->app->renderer->render(
         $self,
-        { 
+        {
             template    => 'perldoc/'.$template_name,
-            partial     => 1, 
-            handler     => 'ep', 
+            partial     => 1,
+            handler     => 'ep',
             title       => $title,
             linked_file => $linked_file_name,
             parts       => \@parts,
@@ -394,14 +395,14 @@ sub _perldoc {
     return;
 }
 
-# ------------------------------------------------------------------------------ 
+# ------------------------------------------------------------------------------
 
 sub __start_table {
     my ($name, $span) = @_;
     return qq|<table class="tag-table"><tr><th colspan="$span">$name</th></tr>|;
 }
 
-# ------------------------------------------------------------------------------ 
+# ------------------------------------------------------------------------------
 
 sub _pod_to_html {
     return undef unless defined(my $pod = shift);
@@ -424,11 +425,11 @@ sub _pod_to_html {
     return $output;
 }
 
-# ------------------------------------------------------------------------------ 
+# ------------------------------------------------------------------------------
 
 sub _parse_attributes {
     my ($html_r, $package, $module) = @_;
-    
+
     $module =~ s/\.pm$//;
 
     require "$module.pm";
@@ -443,7 +444,7 @@ sub _parse_attributes {
             $local_attributes{$attr} = 1;
         }
     }
-    
+
     if ($meta->can("get_all_attributes")) {
         foreach my $attr ($meta->get_all_attributes) {
             if (!exists $local_attributes{$attr->name}) {
@@ -466,7 +467,7 @@ sub _parse_attributes {
     return;
 }
 
-# ============================================================================== 
+# ==============================================================================
 
 1;
 
